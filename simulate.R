@@ -33,5 +33,17 @@ for (i in 1:nrow(network0)) {
   adj_mats[,,i] <- row_to_adj_mat(network0[i,], n, player_names)
 }
 
-network0_siena <- sienaDependent(adj_mats) 
-data_siena <- sienaDataCreate(network0_siena)
+# allowOnly specified in sienaDependent help page
+network0_siena <- sienaDependent(adj_mats, allowOnly = F) 
+data <- sienaDataCreate(network0_siena)
+print01Report(data, modelname = "network0")
+
+# Create model
+effects <- getEffects(data)  # which effects do we want?
+effectsDocumentation(effects)
+
+effects <- includeEffects(effects, transTrip, cycle3)
+effects
+
+algorithm <- sienaAlgorithmCreate(projname = "project_network0")
+#ans <- siena07(algorithm, data = data, effects = effects)
