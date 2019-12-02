@@ -3,7 +3,7 @@ library(RSiena)
 network0 <- read.csv("network0.csv")
 
 # convert row in network CSV to adjacency matrix
-# adj_row: 1 row data frame 
+# adj_row: vector from slicing data frame
 # n: # players (treat LAPTOP as extra player P0)
 # player_names: used for indexing into network CSV
 row_to_adj_mat <- function(adj_row, n, player_names) {
@@ -25,10 +25,13 @@ row_to_adj_mat <- function(adj_row, n, player_names) {
 }
 
 # testing
-adj_row <- network[1, ]
 n <- 7
 player_names <- c("LAPTOP", "P1", "P2", "P3", "P4", "P5", "P6", "P7")
-row_to_adj_mat(adj_row, n, player_names)
+adj_mats <- array(NA, dim = c(n+1, n+1, nrow(network0)),
+                  dimnames = list(player_names, player_names, NULL))
+for (i in 1:nrow(network0)) {
+  adj_mats[,,i] <- row_to_adj_mat(network0[i,], n, player_names)
+}
 
-
-
+network0_siena <- sienaDependent(adj_mats) 
+data_siena <- sienaDataCreate(network0_siena)
