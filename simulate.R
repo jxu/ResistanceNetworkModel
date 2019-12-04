@@ -33,16 +33,27 @@ for (i in 1:nrow(network0)) {
 # Create Siena data objects
 network0_siena <- sienaDependent(adj_mats, allowOnly = F) 
 data <- sienaDataCreate(network0_siena)
-print01Report(data, modelname = "network0")
+print01Report(data, modelname = "model_network0")
+
+# Visualizations
+
+# Plot Hamming distances between networks
+hamming_dists <- data.frame(t = 1:(nrow(network0)-1), hamming = 0)
+for (t in 1:(nrow(network0)-1)) {
+  hamming_dists[t, "hamming"] <- sum(adj_mats[,,t+1] != adj_mats[,,t])
+}
+
+ggplot(hamming_dists, aes(x = hamming)) + 
+  geom_bar() +
+  labs(title = "Hamming Distance Between Consecutive Networks",
+       x = "Hamming Distance", y = "Count") +
+  theme_minimal()
 
 # Siena model
 effects <- getEffects(data)
 effectsDocumentation(effects)  # list effects
 
-# transitive triplets problematic: only one player looks at another player, so 
-# no timestep shows a transitive triplet (coeff -9.81, with very high 120 SE)
 effects <- includeEffects(effects, recip, cycle3)
-effects
 
 algorithm <- sienaAlgorithmCreate(projname = "project_network0")
 ans <- siena07(algorithm, data = data, effects = effects)
