@@ -1,0 +1,149 @@
+---
+title: "Resistance Network Code"
+author: "Jason Xu, Cheyenne Ehman"
+date: "12/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data import and preprocessing
+
+
+```{r, cache=TRUE}
+# network CSV to use as dataset
+network0 <- read.csv("network0.csv")
+
+# convert row in network CSV to adjacency matrix
+# adj_row: vector from slicing data frame
+# player_names: used for indexing into network CSV
+row_to_adj_mat <- function(adj_row, player_names) {
+  n <- length(player_names)
+  adj_mat <- matrix(0, nrow = n, ncol = n, 
+                    dimnames = list(player_names, player_names))
+  
+  for (row_player in player_names) {
+    for (col_player in player_names) {
+      adj_row_var <- paste(row_player, "TO", col_player, sep = "_")  # column name in CSV file
+      adj_mat[row_player, col_player] <- adj_row[1, adj_row_var]
+    }
+  }
+  
+  return(adj_mat)
+}
+
+# convert CSV to 3D array of adjacency matrices
+player_names <- c("P1", "P2", "P3", "P4", "P5", "P6", "P7")
+n <- length(player_names)
+adj_mats <- array(NA, dim = c(n, n, nrow(network0)),
+                  dimnames = list(player_names, player_names, NULL))
+for (i in 1:nrow(network0)) {
+  adj_mats[,,i] <- row_to_adj_mat(network0[i,], player_names)
+}
+
+```
+
+# Exploratory Visualizations 
+
+```{r, message=FALSE, fig.cap = "Network visualizations of the first 6 timestamps",fig.height=5, fig.pos="h"}
+# visualizations
+library(igraph)
+
+assign_graphs <- function(num){
+  assign(paste0("adj_",num), 
+         graph_from_adjacency_matrix(adj_mats[,,num]))
+}
+
+graphs <- lapply(1:dim(adj_mats)[3], assign_graphs)
+
+
+# plot the first six graphs
+par(mfrow = c(2,3))
+for(i in 1:6){
+  plot(graphs[[i]],
+       edge.arrow.size = 1,vertex.color = "light blue", 
+       vertex.label.color="black",vertex.label.cex=1, 
+       vertex.size =40, main = paste0("Time ",i), layout = layout_in_circle)
+}
+
+```
+
+```{r, fig.cap="Histogram og hamming distances", fig.height = 4}
+library(ggplot2)
+# Plot Hamming distances between networks
+hamming_dists <- data.frame(t = 1:(nrow(network0)-1), hamming = 0)
+for (t in 1:(nrow(network0)-1)) {
+  hamming_dists[t, "hamming"] <- sum(adj_mats[,,t+1] != adj_mats[,,t])
+}
+
+ggplot(hamming_dists, aes(x = hamming)) + 
+  geom_bar() +
+  labs(title = "Hamming Distance Between Consecutive Networks",
+       x = "Hamming Distance", y = "Count") +
+  theme_minimal()
+```
+
+```{r, fig.cap="Scatter plot of the number of edges in graphs over time", fig.height = 3,fig.pos="h!"}
+#number of edges 
+edges <- sapply(graphs, gsize)
+#scatter plot similar to density for edges 
+ggplot(data = data.frame(Time = 1:length(edges),Edges = edges), 
+       aes(x = Time, y = Edges)) +
+  geom_point(alpha = 0.2) + 
+  theme_minimal() + 
+  labs(title = "Plot of Edges over time")
+
+```
+
+
+
+
+```{r, fig.cap= "Histogram of the number of mutual edges over time", fig.height = 3,fig.pos="h!"}
+#count mutual ties  
+count_mut <- function(graph){
+  return(dyad_census(graph)$mut) 
+}
+
+mutuals <- sapply(graphs, count_mut)
+ggplot(data = data.frame(Time = 1:length(mutuals),Mutual = mutuals),
+       aes(x = Mutual)) +
+  geom_bar() + 
+  theme_minimal()+ 
+  labs(title = "Mutual Edges Histogram", 
+       x = "# Mutual Edges in all Graphs", y = "")
+```
+
+# Results
+
+
+```{r, cache = TRUE}
+library(RSiena)
+# Create Siena data objects
+network0_siena <- sienaDependent(adj_mats, allowOnly = F) 
+data <- sienaDataCreate(network0_siena)
+print01Report(data, modelname = "model_network0")
+```
+
+
+```{r, cache = TRUE}
+# Siena model
+effects <- getEffects(data)
+effectsDocumentation(effects)  # list effects
+
+effects <- includeEffects(effects, recip, cycle3)
+
+algorithm <- sienaAlgorithmCreate(projname = "project_network0")
+ans <- siena07(algorithm, data = data, effects = effects)
+ans
+```
+
+```{r}
+rate <- data.frame(t = 1:(nrow(network0)-1), rate = ans$rate)
+ggplot(rate, aes(x=rate)) + 
+  geom_histogram(bins=40) + 
+  labs(title = "Rate parameter for each timestep") +
+  theme_minimal()
+```
+
